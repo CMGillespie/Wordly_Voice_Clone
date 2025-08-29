@@ -2,76 +2,118 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- DOM Elements ---
     const configInputArea = document.getElementById('config-input-area');
     const tempSessionIdInput = document.getElementById('temp-session-id');
-    const tempPasscodeInput = document.getElementById('temp-passcode');
-    const apiKeyInput = document.getElementById('api-key'); // The input field for the key
+    const apiKeyInput = document.getElementById('api-key');
     const tempConnectBtn = document.getElementById('temp-connect-btn');
     const tempStatus = document.getElementById('temp-status');
     const appPage = document.getElementById('app-page');
     const disconnectBtn = document.getElementById('disconnect-btn');
     const transcriptArea = document.getElementById('transcript-area');
     const mainAudioPlayer = document.getElementById('main-audio-player');
-    const voiceToggle = document.getElementById('voice-toggle');
+    const languageSelect = document.getElementById('language-select');
+    const audioToggle = document.getElementById('audio-toggle');
 
     // --- State ---
     let websocket = null;
     let audioQueue = [];
     let isPlaying = false;
-    let apiKey = ''; // Will be set from the input field
-    
-    const FEMALE_VOICE_ID = '21m00Tcm4TlvDq8ikWAM';
-    const MALE_VOICE_ID = '29vD33N1CtxCmqQRPOHJ';
-    let selectedVoiceId = FEMALE_VOICE_ID;
+    let apiKey = '';
+    let isDeliberateDisconnect = false;
+    let reconnectInterval = null;
+    let currentSessionId = '';
+    let audioEnabled = true;
 
+    // --- ElevenLabs Data ---
+    const elevenLabsLanguages = {
+        "en": "English", "ja": "Japanese", "zh": "Chinese", "de": "German",
+        "hi": "Hindi", "fr": "French", "ko": "Korean", "pt": "Portuguese",
+        "it": "Italian", "es": "Spanish", "id": "Indonesian", "nl": "Dutch",
+        "tr": "Turkish", "fi": "Filipino", "pl": "Polish", "sv": "Swedish",
+        "bg": "Bulgarian", "ro": "Romanian", "ar": "Arabic", "cs": "Czech",
+        "el": "Greek", "fi": "Finnish", "hr": "Croatian", "ms": "Malay",
+        "sk": "Slovak", "da": "Danish", "ta": "Tamil", "uk": "Ukrainian"
+    };
+    const VOICE_ID = '21m00Tcm4TlvDq8ikWAM';
+
+    // --- Initialization ---
+    // Populate Language Dropdown
+    Object.entries(elevenLabsLanguages).forEach(([code, name]) => {
+        const option = document.createElement('option');
+        option.value = code;
+        option.textContent = name;
+        if (code === 'en') option.selected = true;
+        languageSelect.appendChild(option);
+    });
+    
     // --- Event Listeners ---
     tempConnectBtn.addEventListener('click', connect);
     disconnectBtn.addEventListener('click', disconnect);
     mainAudioPlayer.addEventListener('ended', onAudioEnded);
     mainAudioPlayer.addEventListener('error', onAudioError);
-    voiceToggle.addEventListener('change', handleVoiceChange);
+    audioToggle.addEventListener('change', handleAudioToggle);
+    languageSelect.addEventListener('change', handleLanguageChange);
 
     function connect() {
-        const sessionId = tempSessionIdInput.value;
-        const passcode = tempPasscodeInput.value;
-        apiKey = apiKeyInput.value.trim(); // Get the key from the input field
+        currentSessionId = tempSessionIdInput.value;
+        apiKey = apiKeyInput.value.trim();
 
-        if (!sessionId || !apiKey) {
+        if (!currentSessionId || !apiKey) {
             tempStatus.textContent = "Session ID and API Key are required.";
             return;
         }
         
         configInputArea.style.display = 'none';
         appPage.style.display = 'flex';
-        connectWebSocket(sessionId, passcode);
+        isDeliberateDisconnect = false;
+        connectWebSocket();
     }
 
     function disconnect() {
-        if (websocket) {
-            websocket.onclose = null;
-            websocket.close(1000, "User disconnected");
-        }
-        location.reload();
-    }
-    
-    function handleVoiceChange() {
-        selectedVoiceId = voiceToggle.checked ? MALE_VOICE_ID : FEMALE_VOICE_ID;
+        isDeliberateDisconnect = true;
+        if (reconnectInterval) clearInterval(reconnectInterval);
+        if (websocket) websocket.close(1000, "User disconnected");
+        stopAndClearAudio();
+        
+        appPage.style.display = 'none';
+        configInputArea.style.display = 'block';
     }
 
-    function connectWebSocket(sessionId, passcode) {
+    function handleAudioToggle() {
+        audioEnabled = audioToggle.checked;
+        if (!audioEnabled) {
+            stopAndClearAudio();
+        }
+    }
+    
+    function handleLanguageChange() {
+        if (websocket && websocket.readyState === WebSocket.OPEN) {
+            stopAndClearAudio();
+            transcriptArea.innerHTML = ''; // Clear transcript on language change
+            websocket.send(JSON.stringify({ type: 'change', languageCode: languageSelect.value }));
+        }
+    }
+    
+    function connectWebSocket() {
+        if (websocket) return;
+        tempStatus.textContent = "Connecting...";
+        
         websocket = new WebSocket('wss://endpoint.wordly.ai/attend');
 
         websocket.onopen = () => {
+            if (reconnectInterval) clearInterval(reconnectInterval);
             const connectRequest = {
                 type: 'connect',
-                presentationCode: sessionId,
-                languageCode: 'en',
+                presentationCode: currentSessionId,
+                languageCode: languageSelect.value,
                 identifier: `cloning-test-${Date.now()}`
             };
-            if (passcode) connectRequest.accessKey = passcode;
             websocket.send(JSON.stringify(connectRequest));
         };
 
         websocket.onmessage = (event) => {
             const message = JSON.parse(event.data);
+            if (message.type === 'status' && message.success) {
+                tempStatus.textContent = "Connected.";
+            }
             if (message.type === 'phrase' && message.isFinal && message.translatedText) {
                 const text = message.translatedText;
                 transcriptArea.innerHTML += `<div class="phrase">${text}</div>`;
@@ -82,19 +124,27 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         };
 
-        websocket.onclose = () => { websocket = null; };
-        websocket.onerror = () => { console.error("WebSocket Error."); };
+        websocket.onclose = () => {
+            websocket = null;
+            if (isDeliberateDisconnect) return;
+            tempStatus.textContent = "Connection lost. Reconnecting...";
+            if (reconnectInterval) clearInterval(reconnectInterval);
+            reconnectInterval = setInterval(connectWebSocket, 3000);
+        };
     }
 
     async function processAudioQueue() {
-        if (isPlaying || audioQueue.length === 0) {
+        if (isPlaying || audioQueue.length === 0 || !audioEnabled) {
             return;
         }
 
         isPlaying = true;
         const textToSpeak = audioQueue.shift();
         
-        const url = `https://api.elevenlabs.io/v1/text-to-speech/${selectedVoiceId}`;
+        const selectedLang = languageSelect.value;
+        const modelId = (selectedLang === 'en') ? 'eleven_monolingual_v1' : 'eleven_multilingual_v2';
+        
+        const url = `https://api.elevenlabs.io/v1/text-to-speech/${VOICE_ID}`;
 
         try {
             const response = await fetch(url, {
@@ -105,7 +155,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 },
                 body: JSON.stringify({
                     text: textToSpeak,
-                    model_id: "eleven_monolingual_v1"
+                    model_id: modelId
                 })
             });
 
@@ -138,5 +188,12 @@ document.addEventListener('DOMContentLoaded', () => {
     function onAudioError() {
         console.error("An error occurred with the audio player.");
         onAudioEnded();
+    }
+    
+    function stopAndClearAudio() {
+        mainAudioPlayer.pause();
+        mainAudioPlayer.src = '';
+        audioQueue = [];
+        isPlaying = false;
     }
 });
