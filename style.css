@@ -27,13 +27,25 @@ body {
   padding: 20px;
 }
 
-.config-input-area {
+.config-input-area, #app-page {
   width: 100%;
-  max-width: 400px;
+  max-width: 700px;
   background-color: var(--card-bg-color);
   border-radius: 12px;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
   padding: 30px;
+}
+
+#app-page {
+    display: flex;
+    flex-direction: column;
+    height: 85vh;
+    padding: 0;
+}
+
+.logo {
+  max-width: 150px;
+  margin: 0 auto 20px;
 }
 
 h1, h2 {
@@ -87,18 +99,6 @@ button:hover {
 }
 
 /* App Styles */
-#app-page {
-    display: flex;
-    flex-direction: column;
-    width: 100%;
-    max-width: 600px;
-    height: 85vh;
-    background-color: var(--card-bg-color);
-    border-radius: 12px;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
-    overflow: hidden;
-}
-
 .app-header {
   padding: 15px 20px;
   border-bottom: 1px solid var(--border-color);
@@ -113,14 +113,14 @@ button:hover {
 .app-header h1 {
     margin: 0;
     font-size: 1.2em;
-    flex-grow: 1; /* Allow title to take space */
+    flex-grow: 1;
 }
 
 .controls {
     display: flex;
     align-items: center;
     gap: 15px;
-    flex-wrap: wrap; /* Allow controls to wrap on smaller screens */
+    flex-wrap: wrap;
 }
 
 .setting-group {
@@ -158,6 +158,15 @@ button:hover {
   background-color: var(--primary-bg-color);
   margin-bottom: 10px;
   line-height: 1.5;
+}
+
+#start-audio-container {
+    padding: 20px;
+    border-top: 1px solid var(--border-color);
+}
+
+#start-audio-btn {
+    width: 100%;
 }
 
 /* Toggle Switch Styles */
