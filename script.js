@@ -1,18 +1,17 @@
 document.addEventListener('DOMContentLoaded', () => {
     // --- DOM Elements ---
-    const configInputArea = document.getElementById('config-input-area');
+    const configCard = document.getElementById('config-card');
     const tempSessionIdInput = document.getElementById('temp-session-id');
     const apiKeyInput = document.getElementById('api-key');
     const tempConnectBtn = document.getElementById('temp-connect-btn');
     const tempStatus = document.getElementById('temp-status');
-    const appPage = document.getElementById('app-page');
+    const appCard = document.getElementById('app-card');
     const disconnectBtn = document.getElementById('disconnect-btn');
     const transcriptArea = document.getElementById('transcript-area');
     const mainAudioPlayer = document.getElementById('main-audio-player');
     const languageSelect = document.getElementById('language-select');
     const voiceSelect = document.getElementById('voice-select');
     const audioToggle = document.getElementById('audio-toggle');
-    const deviceSelect = document.getElementById('device-select');
     const startAudioBtn = document.getElementById('start-audio-btn');
     const startAudioContainer = document.getElementById('start-audio-container');
 
@@ -26,18 +25,19 @@ document.addEventListener('DOMContentLoaded', () => {
     let reconnectInterval = null;
     let currentSessionId = '';
     let audioEnabled = true;
-    let selectedDeviceId = '';
 
     // --- ElevenLabs Data ---
+    // MODIFIED: Added Chinese back to the list
     const elevenLabsLanguages = {
-        "en": "English", "ja": "Japanese", "de": "German", "hi": "Hindi", 
-        "fr": "French", "ko": "Korean", "pt": "Portuguese", "it": "Italian", 
-        "es": "Spanish", "id": "Indonesian", "nl": "Dutch", "tr": "Turkish", 
-        "fi": "Filipino", "pl": "Polish", "sv": "Swedish", "bg": "Bulgarian", 
-        "ro": "Romanian", "ar": "Arabic", "cs": "Czech", "el": "Greek", 
-        "fi": "Finnish", "hr": "Croatian", "ms": "Malay", "sk": "Slovak", 
-        "da": "Danish", "ta": "Tamil", "uk": "Ukrainian"
+        "ar": "Arabic", "bg": "Bulgarian", "zh": "Chinese", "hr": "Croatian", 
+        "cs": "Czech", "da": "Danish", "nl": "Dutch", "en": "English", 
+        "fi": "Finnish", "tl": "Filipino", "fr": "French", "de": "German", 
+        "el": "Greek", "hi": "Hindi", "id": "Indonesian", "it": "Italian", 
+        "ja": "Japanese", "ko": "Korean", "ms": "Malay", "pl": "Polish", 
+        "pt": "Portuguese", "ro": "Romanian", "sk": "Slovak", "es": "Spanish", 
+        "sv": "Swedish", "ta": "Tamil", "tr": "Turkish", "uk": "Ukrainian"
     };
+    
     const voiceMap = {
         "Female (Rachel)": "21m00Tcm4TlvDq8ikWAM",
         "Male (Drew)": "29vD33N1CtxCmqQRPOHJ",
@@ -46,7 +46,9 @@ document.addEventListener('DOMContentLoaded', () => {
     let selectedVoiceId = voiceMap["Female (Rachel)"];
 
     // --- Initialization ---
-    Object.entries(elevenLabsLanguages).forEach(([code, name]) => {
+    // MODIFIED: The list is now sorted alphabetically before populating
+    Object.keys(elevenLabsLanguages).sort((a, b) => elevenLabsLanguages[a].localeCompare(elevenLabsLanguages[b])).forEach(code => {
+        const name = elevenLabsLanguages[code];
         const option = document.createElement('option');
         option.value = code;
         option.textContent = name;
@@ -69,7 +71,6 @@ document.addEventListener('DOMContentLoaded', () => {
     languageSelect.addEventListener('change', handleLanguageChange);
     voiceSelect.addEventListener('change', () => { selectedVoiceId = voiceSelect.value; });
     audioToggle.addEventListener('change', handleAudioToggle);
-    deviceSelect.addEventListener('change', () => { selectedDeviceId = deviceSelect.value; });
 
     function onUserInteraction() {
         hasInteracted = true;
@@ -78,21 +79,15 @@ document.addEventListener('DOMContentLoaded', () => {
         processAudioQueue();
     }
 
-    async function connect() {
+    function connect() {
         currentSessionId = tempSessionIdInput.value;
         apiKey = apiKeyInput.value.trim();
         if (!currentSessionId || !apiKey) {
             tempStatus.textContent = "Session ID and API Key are required.";
             return;
         }
-        try {
-            await initializeAudioDevices();
-        } catch (err) {
-            tempStatus.textContent = `Error: ${err.message}. Please allow microphone access.`;
-            return;
-        }
-        configInputArea.style.display = 'none';
-        appPage.style.display = 'flex';
+        configCard.style.display = 'none';
+        appCard.style.display = 'flex';
         isDeliberateDisconnect = false;
         connectWebSocket();
     }
@@ -122,34 +117,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
     
-    async function initializeAudioDevices() {
-        if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) {
-            throw new Error("This browser doesn't support audio device selection.");
-        }
-        try {
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            stream.getTracks().forEach(track => track.stop());
-        } catch (error) {
-            throw new Error("Microphone permission is required to list audio devices");
-        }
-        
-        const devices = await navigator.mediaDevices.enumerateDevices();
-        const audioOutputDevices = devices.filter(device => device.kind === 'audiooutput');
-        
-        deviceSelect.innerHTML = '';
-        const defaultOption = document.createElement('option');
-        defaultOption.value = '';
-        defaultOption.textContent = 'System Default';
-        deviceSelect.appendChild(defaultOption);
-
-        audioOutputDevices.forEach(device => {
-            const option = document.createElement('option');
-            option.value = device.deviceId;
-            option.textContent = device.label || `Output ${audioOutputDevices.indexOf(device) + 1}`;
-            deviceSelect.appendChild(option);
-        });
-    }
-
     function connectWebSocket() {
         if (websocket) return;
         tempStatus.textContent = "Connecting...";
@@ -221,11 +188,6 @@ document.addEventListener('DOMContentLoaded', () => {
             const audioBlob = await response.blob();
             const audioUrl = URL.createObjectURL(audioBlob);
             mainAudioPlayer.src = audioUrl;
-            
-            if (selectedDeviceId && typeof mainAudioPlayer.setSinkId === 'function') {
-                await mainAudioPlayer.setSinkId(selectedDeviceId);
-            }
-
             mainAudioPlayer.play();
 
         } catch (error) {
