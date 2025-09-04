@@ -36,7 +36,7 @@ document.addEventListener('DOMContentLoaded', () => {
         "fi": "Filipino", "pl": "Polish", "sv": "Swedish", "bg": "Bulgarian", 
         "ro": "Romanian", "ar": "Arabic", "cs": "Czech", "el": "Greek", 
         "fi": "Finnish", "hr": "Croatian", "ms": "Malay", "sk": "Slovak", 
-        "da": "Danish", "ta": "Tamil", "uk": "Ukrainian"
+        "da": "Danish", "ta": "Tamil", "uk": "Ukrainian", "zh": "Chinese"
     };
     const voiceMap = {
         "Female (Rachel)": "21m00Tcm4TlvDq8ikWAM",
@@ -46,13 +46,17 @@ document.addEventListener('DOMContentLoaded', () => {
     let selectedVoiceId = voiceMap["Female (Rachel)"];
 
     // --- Initialization ---
-    Object.entries(elevenLabsLanguages).forEach(([code, name]) => {
+    const sortedLanguages = Object.entries(elevenLabsLanguages)
+        .sort(([, a], [, b]) => a.localeCompare(b));
+
+    sortedLanguages.forEach(([code, name]) => {
         const option = document.createElement('option');
         option.value = code;
         option.textContent = name;
         if (code === 'en') option.selected = true;
         languageSelect.appendChild(option);
     });
+
     Object.keys(voiceMap).forEach(name => {
         const option = document.createElement('option');
         option.value = voiceMap[name];
