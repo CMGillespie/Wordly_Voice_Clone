@@ -3,54 +3,56 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Voice Cloning Test</title>
+    <title>AI Voice Demo</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-    <div class="page-container">
-        <div id="config-card" class="card">
-            <img src="https://assets-global.website-files.com/61707b4f874fa22b7482b07e/65b85f6f7e935c9f1f9c70f1_Wordly%20AI%20Translation%20and%20Captions.svg" alt="Logo" class="logo">
-            <h2>AI Voice Demo</h2>
-            <div class="form-group">
-                <label for="temp-session-id">Session ID</label>
-                <input type="text" id="temp-session-id" placeholder="e.g., ABCD-1234" required>
-            </div>
-            <div class="form-group">
-                <label for="api-key">ElevenLabs API Key</label>
-                <input type="password" id="api-key" placeholder="Enter your secret key">
-            </div>
-            <button id="temp-connect-btn" class="primary-btn">Connect</button>
-            <div id="temp-status"></div>
+    <div id="config-input-area" class="config-input-area">
+        <img src="https://assets-global.website-files.com/61707b4f874fa22b7482b07e/65b85f6f7e935c9f1f9c70f1_Wordly%20AI%20Translation%20and%20Captions.svg" alt="Logo" class="logo">
+        <h2>AI Voice Demo</h2>
+        <div class="form-group">
+            <label for="temp-session-id">Session ID:</label>
+            <input type="text" id="temp-session-id" placeholder="XXXX-0000" required>
         </div>
+        <div class="form-group">
+            <label for="api-key">ElevenLabs API Key:</label>
+            <input type="password" id="api-key" placeholder="Enter your secret key">
+        </div>
+        <button id="temp-connect-btn">Connect</button>
+        <div id="temp-status"></div>
+    </div>
 
-        <div id="app-card" class="card" style="display: none;">
-            <header class="app-header">
-                <h2>Live Transcript</h2>
-                <div class="controls">
-                    <div class="setting-group">
-                        <select id="language-select"></select>
-                    </div>
-                    <div class="setting-group">
-                        <select id="voice-select" class="setting-select"></select>
-                    </div>
-                    <div class="setting-group">
-                        <label class="toggle">
-                            <input type="checkbox" id="audio-toggle" checked>
-                            <span class="slider"></span>
-                        </label>
-                        <span>Audio</span>
-                    </div>
-                    <button id="disconnect-btn" class="disconnect-btn">Disconnect</button>
+    <div id="app-page" style="display: none;">
+        <header class="app-header">
+            <h1>Live Transcript</h1>
+            <div class="controls">
+                <div class="setting-group">
+                    <label for="device-select">Output:</label>
+                    <select id="device-select" class="setting-select"></select>
                 </div>
-            </header>
-            <main class="main-content">
-                <div id="transcript-area" class="transcript-area"></div>
-                 <div id="start-audio-container">
-                     <button id="start-audio-btn">Click to Start Audio</button>
+                <div class="setting-group">
+                    <select id="language-select" class="setting-select"></select>
                 </div>
-            </main>
-        </div>
+                <div class="setting-group">
+                     <select id="voice-select" class="setting-select"></select>
+                </div>
+                <div class="setting-group">
+                    <label class="toggle">
+                        <input type="checkbox" id="audio-toggle" checked>
+                        <span class="slider"></span>
+                    </label>
+                    <span>Audio</span>
+                </div>
+                <button id="disconnect-btn" class="disconnect-btn">Disconnect</button>
+            </div>
+        </header>
+        <main class="main-content">
+            <div id="transcript-area" class="transcript-area"></div>
+             <div id="start-audio-container">
+                 <button id="start-audio-btn">Click to Start Audio</button>
+            </div>
+        </main>
     </div>
 
     <audio id="main-audio-player" style="display:none;"></audio>
