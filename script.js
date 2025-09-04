@@ -9,33 +9,40 @@ document.addEventListener('DOMContentLoaded', () => {
     const disconnectBtn = document.getElementById('disconnect-btn');
     const transcriptArea = document.getElementById('transcript-area');
     const mainAudioPlayer = document.getElementById('main-audio-player');
-    const voiceToggle = document.getElementById('voice-toggle');
-    const deviceSelect = document.getElementById('device-select');
+    const voiceSelect = document.getElementById('voice-select'); // New voice selector
 
     // --- State ---
     let websocket = null;
     let audioQueue = [];
     let isPlaying = false;
     let apiKey = '';
-    let selectedDeviceId = '';
     
-    const FEMALE_VOICE_ID = '21m00Tcm4TlvDq8ikWAM';
-    const MALE_VOICE_ID = '29vD33N1CtxCmqQRPOHJ';
-    let selectedVoiceId = FEMALE_VOICE_ID;
+    // --- MODIFIED: Voice selection is now a map ---
+    const voiceMap = {
+        "Female (Rachel)": "21m00Tcm4TlvDq8ikWAM",
+        "Male (Drew)": "29vD33N1CtxCmqQRPOHJ",
+        "Your Cloned Voice": "doPwgiUDu8SODZQApZGl"
+    };
+    let selectedVoiceId = voiceMap["Female (Rachel)"]; // Default voice
+
+    // --- Initialization: Populate the voice dropdown ---
+    Object.keys(voiceMap).forEach(name => {
+        const option = document.createElement('option');
+        option.value = voiceMap[name];
+        option.textContent = name;
+        voiceSelect.appendChild(option);
+    });
 
     // --- Event Listeners ---
     tempConnectBtn.addEventListener('click', connect);
     disconnectBtn.addEventListener('click', disconnect);
     mainAudioPlayer.addEventListener('ended', onAudioEnded);
     mainAudioPlayer.addEventListener('error', onAudioError);
-    voiceToggle.addEventListener('change', () => {
-        selectedVoiceId = voiceToggle.checked ? MALE_VOICE_ID : FEMALE_VOICE_ID;
-    });
-    deviceSelect.addEventListener('change', () => {
-        selectedDeviceId = deviceSelect.value;
+    voiceSelect.addEventListener('change', () => {
+        selectedVoiceId = voiceSelect.value;
     });
 
-    async function connect() {
+    function connect() {
         const sessionId = tempSessionIdInput.value;
         apiKey = apiKeyInput.value.trim();
 
@@ -44,14 +51,6 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
         
-        // --- Get audio devices before connecting ---
-        try {
-            await initializeAudioDevices();
-        } catch (err) {
-            tempStatus.textContent = `Error: ${err.message}. Please allow microphone access.`;
-            return;
-        }
-
         configInputArea.style.display = 'none';
         appPage.style.display = 'flex';
         connectWebSocket(sessionId);
@@ -62,35 +61,6 @@ document.addEventListener('DOMContentLoaded', () => {
         location.reload();
     }
     
-    // --- Audio Device Logic (from Audio Router) ---
-    async function initializeAudioDevices() {
-        if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) {
-            throw new Error("This browser doesn't support audio device selection.");
-        }
-        try {
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            stream.getTracks().forEach(track => track.stop());
-        } catch (error) {
-            throw new Error("Microphone permission is required to list audio devices");
-        }
-        
-        const devices = await navigator.mediaDevices.enumerateDevices();
-        const audioOutputDevices = devices.filter(device => device.kind === 'audiooutput');
-        
-        deviceSelect.innerHTML = ''; // Clear previous options
-        const defaultOption = document.createElement('option');
-        defaultOption.value = '';
-        defaultOption.textContent = 'System Default';
-        deviceSelect.appendChild(defaultOption);
-
-        audioOutputDevices.forEach(device => {
-            const option = document.createElement('option');
-            option.value = device.deviceId;
-            option.textContent = device.label || `Output ${audioOutputDevices.indexOf(device) + 1}`;
-            deviceSelect.appendChild(option);
-        });
-    }
-
     function connectWebSocket(sessionId) {
         websocket = new WebSocket('wss://endpoint.wordly.ai/attend');
 
@@ -98,7 +68,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const connectRequest = {
                 type: 'connect',
                 presentationCode: sessionId,
-                languageCode: 'en',
+                languageCode: 'en', // Hard-coded to English for this test app
                 identifier: `cloning-test-${Date.now()}`
             };
             websocket.send(JSON.stringify(connectRequest));
@@ -145,12 +115,6 @@ document.addEventListener('DOMContentLoaded', () => {
             const audioBlob = await response.blob();
             const audioUrl = URL.createObjectURL(audioBlob);
             mainAudioPlayer.src = audioUrl;
-
-            // --- Set the audio output device before playing ---
-            if (selectedDeviceId && typeof mainAudioPlayer.setSinkId === 'function') {
-                await mainAudioPlayer.setSinkId(selectedDeviceId);
-            }
-
             mainAudioPlayer.play();
 
         } catch (error) {
