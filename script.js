@@ -1,17 +1,18 @@
 document.addEventListener('DOMContentLoaded', () => {
     // --- DOM Elements ---
-    const configCard = document.getElementById('config-card');
+    const configInputArea = document.getElementById('config-input-area');
     const tempSessionIdInput = document.getElementById('temp-session-id');
     const apiKeyInput = document.getElementById('api-key');
     const tempConnectBtn = document.getElementById('temp-connect-btn');
     const tempStatus = document.getElementById('temp-status');
-    const appCard = document.getElementById('app-card');
+    const appPage = document.getElementById('app-page');
     const disconnectBtn = document.getElementById('disconnect-btn');
     const transcriptArea = document.getElementById('transcript-area');
     const mainAudioPlayer = document.getElementById('main-audio-player');
     const languageSelect = document.getElementById('language-select');
     const voiceSelect = document.getElementById('voice-select');
     const audioToggle = document.getElementById('audio-toggle');
+    const deviceSelect = document.getElementById('device-select');
     const startAudioBtn = document.getElementById('start-audio-btn');
     const startAudioContainer = document.getElementById('start-audio-container');
 
@@ -25,18 +26,18 @@ document.addEventListener('DOMContentLoaded', () => {
     let reconnectInterval = null;
     let currentSessionId = '';
     let audioEnabled = true;
+    let selectedDeviceId = '';
 
     // --- ElevenLabs Data ---
     const elevenLabsLanguages = {
-        "en": "English", "ja": "Japanese", "de": "German",
-        "hi": "Hindi", "fr": "French", "ko": "Korean", "pt": "Portuguese",
-        "it": "Italian", "es": "Spanish", "id": "Indonesian", "nl": "Dutch",
-        "tr": "Turkish", "fi": "Filipino", "pl": "Polish", "sv": "Swedish",
-        "bg": "Bulgarian", "ro": "Romanian", "ar": "Arabic", "cs": "Czech",
-        "el": "Greek", "fi": "Finnish", "hr": "Croatian", "ms": "Malay",
-        "sk": "Slovak", "da": "Danish", "ta": "Tamil", "uk": "Ukrainian"
+        "en": "English", "ja": "Japanese", "de": "German", "hi": "Hindi", 
+        "fr": "French", "ko": "Korean", "pt": "Portuguese", "it": "Italian", 
+        "es": "Spanish", "id": "Indonesian", "nl": "Dutch", "tr": "Turkish", 
+        "fi": "Filipino", "pl": "Polish", "sv": "Swedish", "bg": "Bulgarian", 
+        "ro": "Romanian", "ar": "Arabic", "cs": "Czech", "el": "Greek", 
+        "fi": "Finnish", "hr": "Croatian", "ms": "Malay", "sk": "Slovak", 
+        "da": "Danish", "ta": "Tamil", "uk": "Ukrainian"
     };
-    
     const voiceMap = {
         "Female (Rachel)": "21m00Tcm4TlvDq8ikWAM",
         "Male (Drew)": "29vD33N1CtxCmqQRPOHJ",
@@ -68,6 +69,7 @@ document.addEventListener('DOMContentLoaded', () => {
     languageSelect.addEventListener('change', handleLanguageChange);
     voiceSelect.addEventListener('change', () => { selectedVoiceId = voiceSelect.value; });
     audioToggle.addEventListener('change', handleAudioToggle);
+    deviceSelect.addEventListener('change', () => { selectedDeviceId = deviceSelect.value; });
 
     function onUserInteraction() {
         hasInteracted = true;
@@ -76,15 +78,21 @@ document.addEventListener('DOMContentLoaded', () => {
         processAudioQueue();
     }
 
-    function connect() {
+    async function connect() {
         currentSessionId = tempSessionIdInput.value;
         apiKey = apiKeyInput.value.trim();
         if (!currentSessionId || !apiKey) {
             tempStatus.textContent = "Session ID and API Key are required.";
             return;
         }
-        configCard.style.display = 'none';
-        appCard.style.display = 'flex';
+        try {
+            await initializeAudioDevices();
+        } catch (err) {
+            tempStatus.textContent = `Error: ${err.message}. Please allow microphone access.`;
+            return;
+        }
+        configInputArea.style.display = 'none';
+        appPage.style.display = 'flex';
         isDeliberateDisconnect = false;
         connectWebSocket();
     }
@@ -114,6 +122,34 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
     
+    async function initializeAudioDevices() {
+        if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) {
+            throw new Error("This browser doesn't support audio device selection.");
+        }
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            stream.getTracks().forEach(track => track.stop());
+        } catch (error) {
+            throw new Error("Microphone permission is required to list audio devices");
+        }
+        
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const audioOutputDevices = devices.filter(device => device.kind === 'audiooutput');
+        
+        deviceSelect.innerHTML = '';
+        const defaultOption = document.createElement('option');
+        defaultOption.value = '';
+        defaultOption.textContent = 'System Default';
+        deviceSelect.appendChild(defaultOption);
+
+        audioOutputDevices.forEach(device => {
+            const option = document.createElement('option');
+            option.value = device.deviceId;
+            option.textContent = device.label || `Output ${audioOutputDevices.indexOf(device) + 1}`;
+            deviceSelect.appendChild(option);
+        });
+    }
+
     function connectWebSocket() {
         if (websocket) return;
         tempStatus.textContent = "Connecting...";
@@ -185,6 +221,11 @@ document.addEventListener('DOMContentLoaded', () => {
             const audioBlob = await response.blob();
             const audioUrl = URL.createObjectURL(audioBlob);
             mainAudioPlayer.src = audioUrl;
+            
+            if (selectedDeviceId && typeof mainAudioPlayer.setSinkId === 'function') {
+                await mainAudioPlayer.setSinkId(selectedDeviceId);
+            }
+
             mainAudioPlayer.play();
 
         } catch (error) {
@@ -193,7 +234,7 @@ document.addEventListener('DOMContentLoaded', () => {
             processAudioQueue();
         }
     }
-
+    
     function stopAndClearAudio() {
         mainAudioPlayer.pause();
         mainAudioPlayer.src = '';
